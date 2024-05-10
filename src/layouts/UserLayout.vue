@@ -21,8 +21,7 @@
 <style scoped>
 #userLayout {
   text-align: center;
-  background: url(https://typora-1313423481.cos.ap-guangzhou.myqcloud.com/typora/image-20230802221730022.png)
-    0% 0% / 100% 100%;
+  
 }
 
 #userLayout .logo {
