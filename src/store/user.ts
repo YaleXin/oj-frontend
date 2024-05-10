@@ -24,6 +24,11 @@ export default {
         });
       }
     },
+    logoutUser({ commit, state }, payload){
+      commit("updateUser", {
+        username: "未登录",
+      });
+    },
   },
   mutations: {
     updateUser(state, payload) {
