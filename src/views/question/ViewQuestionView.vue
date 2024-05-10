@@ -41,9 +41,10 @@
             :style="{ width: '320px' }"
             placeholder="选择编程语言"
           >
-            <a-option>java</a-option>
+          <a-option v-for="(language, index) of languageList" :key="index">{{language}}</a-option>
+            <!-- <a-option>java</a-option>
             <a-option>cpp</a-option>
-            <a-option>go</a-option>
+            <a-option>go</a-option> -->
           </a-select>
         </a-form-item>
       </a-form>
@@ -67,6 +68,11 @@ import {
   QuestionSubmitAddRequest,
   QuestionVO,
 } from "../../../generated/question";
+
+import {
+  SandboxControllerService
+} from "../../../generated/sandbox"
+
 import message from "@arco-design/web-vue/es/message";
 import CodeEditor from "@/components/CodeEditor.vue";
 import MdViewer from "@/components/MdViewer.vue";
@@ -80,6 +86,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const question = ref<QuestionVO>();
+const languageList = ref<String>();
 
 const loadData = async () => {
   const res = await QuestionControllerService.getQuestionVoByIdUsingGet(
@@ -90,10 +97,18 @@ const loadData = async () => {
   } else {
     message.error("加载失败，" + res.message);
   }
+
+  const lanRes = await SandboxControllerService.getLanguagesUsingGet();
+  if(lanRes.code === 0){
+    languageList.value = lanRes.data;
+    // console.log('languages = ', lanRes.data);
+  }else {
+    message.error("加载编程失败，" + lanRes.message);
+  }
 };
 
 const form = ref<QuestionSubmitAddRequest>({
-  language: "java",
+  language: "",
   code: "",
 });
 

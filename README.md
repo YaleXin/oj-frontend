@@ -6,8 +6,9 @@ openapi --input http://localhost:8101/api/user/v2/api-docs --output ./generated/
 
 openapi --input http://localhost:8101/api/question/v2/api-docs --output ./generated/question --client axios
 
+openapi --input http://localhost:8101/api/sandbox/v2/api-docs --output ./generated/sandbox --client axios
 
-然后去到对应的文件夹中，将url前缀删除
+然后去到对应的文件夹中，将url前缀删除 core/OpenAPI.ts 
 
 ## Project setup
 ```
