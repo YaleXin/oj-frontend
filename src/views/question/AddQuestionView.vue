@@ -21,7 +21,7 @@
               v-model="form.judgeConfig.timeLimit"
               placeholder="请输入时间限制"
               mode="button"
-              min="0"
+              :min="0"
               size="large"
             />
           </a-form-item>
@@ -30,7 +30,7 @@
               v-model="form.judgeConfig.memoryLimit"
               placeholder="请输入内存限制"
               mode="button"
-              min="0"
+              :min="0"
               size="large"
             />
           </a-form-item>
@@ -39,7 +39,7 @@
               v-model="form.judgeConfig.stackLimit"
               placeholder="请输入堆栈限制"
               mode="button"
-              min="0"
+              :min="0"
               size="large"
             />
           </a-form-item>
@@ -47,7 +47,7 @@
       </a-form-item>
       <a-form-item
         label="测试输入用例配置"
-        tooltip="一个输入用例一个文本文件，每个输入用例的顺序是其文件名顺序，推荐名字为input_xx.txt，最多允许上传1024个用例"
+        tooltip="一个输入用例一个文本文件，每个输入用例的顺序是其文件名顺序，推荐名字为input_xxxx.txt，最多允许上传1024个用例"
       >
         <a-upload
           action="/"
@@ -68,12 +68,13 @@
           >
             <a-button>取消上传</a-button>
           </a-popconfirm>
+          <a-button @click="inputDownload">下载输入用例</a-button>
         </div>
       </a-form-item>
 
       <a-form-item
         label="测试输出用例配置"
-        tooltip="一个输出用例一个文本文件，每个输出用例的顺序是其文件名顺序，推荐名字为output_xx.txt，最多允许上传1024个用例"
+        tooltip="一个输出用例一个文本文件，每个输出用例的顺序是其文件名顺序，推荐名字为output_xxxx.txt，最多允许上传1024个用例"
       >
         <a-upload
           action="/"
@@ -94,6 +95,7 @@
           >
             <a-button>取消上传</a-button>
           </a-popconfirm>
+          <a-button @click="outputDownload">下载输出用例</a-button>
         </div>
       </a-form-item>
 
@@ -114,6 +116,8 @@ import { QuestionControllerService } from "../../../generated/question";
 import message from "@arco-design/web-vue/es/message";
 import { useRoute } from "vue-router";
 import { useRouter } from "vue-router";
+import JSZip from "jszip";
+import FileSaver from "file-saver";
 
 const route = useRoute();
 // 如果页面地址包含 update，视为更新页面
@@ -149,11 +153,15 @@ const loadData = async () => {
   if (!id) {
     return;
   }
-  const res = await QuestionControllerService.getQuestionVoByIdUsingGet(
+  console.log("question id = ", id);
+  const res = await QuestionControllerService.getAdminQuestionVoByIdUsingGet(
     id as any
   );
   if (res.code === 0) {
     form.value = res.data as any;
+
+    console.log("raw form = ", form.value);
+
     // json 转 js 对象
     if (!form.value.judgeCase) {
       form.value.judgeCase = [
@@ -165,6 +173,7 @@ const loadData = async () => {
     } else {
       form.value.judgeCase = JSON.parse(form.value.judgeCase as any);
     }
+    console.log("form.value.judgeConfig = ", form.value.judgeConfig);
     if (!form.value.judgeConfig) {
       form.value.judgeConfig = {
         memoryLimit: 1000,
@@ -172,13 +181,27 @@ const loadData = async () => {
         timeLimit: 1000,
       };
     } else {
-      form.value.judgeConfig = JSON.parse(form.value.judgeConfig as any);
+      form.value.judgeConfig = JSON.parse(form.value.judgeConfig);
     }
     if (!form.value.tags) {
       form.value.tags = [];
     } else {
       form.value.tags = JSON.parse(form.value.tags as any);
     }
+
+    // 将 字符串型的 judgeConfig 转为 int
+    form.value.judgeConfig.memoryLimit = Number(
+      form.value.judgeConfig.memoryLimit
+    );
+    form.value.judgeConfig.timeLimit = Number(form.value.judgeConfig.timeLimit);
+    form.value.judgeConfig.stackLimit = Number(
+      form.value.judgeConfig.stackLimit
+    );
+
+    // 将输入用例和输出用例转为File对象
+    parseJudgeCase();
+
+    console.log("after parse inputList = ", inputList.value);
   } else {
     message.error("加载失败，" + res.message);
   }
@@ -187,8 +210,47 @@ const loadData = async () => {
 onMounted(() => {
   loadData();
 });
-
+const parseJudgeCase = () => {
+  let judgeCaseLen: number = form.value.judgeCase.length;
+  for (let i = 0; i < judgeCaseLen; i++) {
+    // 先将每一个输入案例的字符串内容转为 Bob 对象
+    let inputBlob = new Blob([form.value.judgeCase[i].input], {
+      type: "text/plain;charset=utf-8",
+    });
+    let outputBlob = new Blob([form.value.judgeCase[i].output], {
+      type: "text/plain;charset=utf-8",
+    });
+    let inputFile: File = new File(
+      [inputBlob],
+      "input_" + String(i).padStart(4, "0") + ".txt",
+      { type: "txt" }
+    );
+    let outputFile: File = new File(
+      [outputBlob],
+      "output_" + String(i).padStart(4, "0") + ".txt",
+      { type: "txt" }
+    );
+    inputList.value.push({
+      name: "input_" + String(i).padStart(4, "0") + ".txt",
+      file: inputFile,
+      percent: 0,
+      status: "init",
+      uid: "",
+      url: "",
+    });
+    outputList.value.push({
+      name: "output_" + String(i).padStart(4, "0") + ".txt",
+      file: outputFile,
+      percent: 0,
+      status: "init",
+      uid: "",
+      url: "",
+    });
+  }
+};
 const doSubmit = async () => {
+  console.log("inputList = ", inputList.value);
+  console.log("outputList = ", outputList.value);
   if (inputList.value.length != outputList.value.length) {
     message.error("输入用例个数和输出用例个数不一致！");
     return;
@@ -291,12 +353,44 @@ const readTextFile = async (file: File) => {
   });
 };
 
+const writeTextFile = async (file: File) => {
+  new File();
+};
+
 const inputCancelUpload = () => {
   inputList.value = [];
 };
 
 const outputCancelUpload = () => {
   outputList.value = [];
+};
+
+const inputDownload = () => {
+  // https://blog.csdn.net/qq_45629145/article/details/120410403
+  const data = inputList.value;
+  List2Zip(data, "input.zip");
+};
+
+const outputDownload = () => {
+  // https://blog.csdn.net/qq_45629145/article/details/120410403
+  const data = outputList.value;
+  List2Zip(data, "output.zip");
+};
+
+const List2Zip = (data, zipName) => {
+  const zip = new JSZip();
+  const cache = {};
+  const promises = [];
+  // 循环读取每个输入用例，然后打包
+  data.forEach((item) => {
+    let file_name = item.name;
+    let fileData = item.file;
+    zip.file(file_name, fileData, { binary: true });
+  });
+  zip.generateAsync({ type: "blob" }).then((content) => {
+    //利用file-saver保存文件  自定义文件名
+    FileSaver.saveAs(content, zipName);
+  });
 };
 </script>
 

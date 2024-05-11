@@ -12,6 +12,7 @@ export type { BaseResponse_long_ } from './models/BaseResponse_long_';
 export type { BaseResponse_Page_Question_ } from './models/BaseResponse_Page_Question_';
 export type { BaseResponse_Page_QuestionSubmitVO_ } from './models/BaseResponse_Page_QuestionSubmitVO_';
 export type { BaseResponse_Page_QuestionVO_ } from './models/BaseResponse_Page_QuestionVO_';
+export type { BaseResponse_Question_ } from './models/BaseResponse_Question_';
 export type { BaseResponse_QuestionVO_ } from './models/BaseResponse_QuestionVO_';
 export type { DeleteRequest } from './models/DeleteRequest';
 export type { JudgeCase } from './models/JudgeCase';
