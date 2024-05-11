@@ -46,47 +46,57 @@
         </a-space>
       </a-form-item>
       <a-form-item
-        label="测试用例配置"
-        :content-flex="false"
-        :merge-props="false"
+        label="测试输入用例配置"
+        tooltip="一个输入用例一个文本文件，每个输入用例的顺序是其文件名顺序，推荐名字为input_xx.txt，最多允许上传1024个用例"
       >
-        <a-form-item
-          v-for="(judgeCaseItem, index) of form.judgeCase"
-          :key="index"
-          no-style
-        >
-          <a-space direction="vertical" style="min-width: 640px">
-            <a-form-item
-              :field="`form.judgeCase[${index}].input`"
-              :label="`输入用例-${index}`"
-              :key="index"
-            >
-              <a-input
-                v-model="judgeCaseItem.input"
-                placeholder="请输入测试输入用例"
-              />
-            </a-form-item>
-            <a-form-item
-              :field="`form.judgeCase[${index}].output`"
-              :label="`输出用例-${index}`"
-              :key="index"
-            >
-              <a-input
-                v-model="judgeCaseItem.output"
-                placeholder="请输入测试输出用例"
-              />
-            </a-form-item>
-            <a-button status="danger" @click="handleDelete(index)">
-              删除
-            </a-button>
-          </a-space>
-        </a-form-item>
-        <div style="margin-top: 32px">
-          <a-button @click="handleAdd" type="outline" status="success"
-            >新增测试用例
-          </a-button>
+        <a-upload
+          action="/"
+          :auto-upload="false"
+          :file-list="inputList"
+          @change="inputCaseOnChange"
+          multiple
+          :show-file-list="false"
+          accept=".txt"
+          :limit="1024"
+        />
+        共{{ inputList.length }}个
+        <div v-show="inputList.length > 0">
+          <a-popconfirm
+            content="是否要清空所有的输入用例？"
+            type="warning"
+            @ok="inputCancelUpload"
+          >
+            <a-button>取消上传</a-button>
+          </a-popconfirm>
         </div>
       </a-form-item>
+
+      <a-form-item
+        label="测试输出用例配置"
+        tooltip="一个输出用例一个文本文件，每个输出用例的顺序是其文件名顺序，推荐名字为output_xx.txt，最多允许上传1024个用例"
+      >
+        <a-upload
+          action="/"
+          :auto-upload="false"
+          :file-list="outputList"
+          @change="outputCaseOnChange"
+          multiple
+          :show-file-list="false"
+          accept=".txt"
+          :limit="1024"
+        />
+        共{{ outputList.length }}个
+        <div v-show="outputList.length > 0">
+          <a-popconfirm
+            content="是否要清空所有的输出用例？"
+            type="warning"
+            @ok="outputCancelUpload"
+          >
+            <a-button>取消上传</a-button>
+          </a-popconfirm>
+        </div>
+      </a-form-item>
+
       <div style="margin-top: 16px" />
       <a-form-item>
         <a-button type="primary" style="min-width: 200px" @click="doSubmit"
@@ -103,10 +113,15 @@ import MdEditor from "@/components/MdEditor.vue";
 import { QuestionControllerService } from "../../../generated/question";
 import message from "@arco-design/web-vue/es/message";
 import { useRoute } from "vue-router";
+import { useRouter } from "vue-router";
 
 const route = useRoute();
 // 如果页面地址包含 update，视为更新页面
 const updatePage = route.path.includes("update");
+
+const inputList = ref([]);
+const outputList = ref([]);
+const router = useRouter();
 
 let form = ref({
   title: "",
@@ -119,10 +134,10 @@ let form = ref({
     timeLimit: 1000,
   },
   judgeCase: [
-    {
-      input: "",
-      output: "",
-    },
+    // {
+    //   input: "",
+    //   output: "",
+    // },
   ],
 });
 
@@ -174,7 +189,44 @@ onMounted(() => {
 });
 
 const doSubmit = async () => {
-  console.log(form.value);
+  if (inputList.value.length != outputList.value.length) {
+    message.error("输入用例个数和输出用例个数不一致！");
+    return;
+  }
+
+  if (inputList.value.length == 0) {
+    message.error("输入和输出用例个数不能为零！");
+    return;
+  }
+
+  // 对输入用例和输出用例按照文件明排序
+  inputList.value = inputList.value.sort((a, b) => {
+    if (a.name < b.name) return -1;
+    if (a.name > b.name) return 1;
+    return 0;
+  });
+
+  outputList.value = outputList.value.sort((a, b) => {
+    if (a.name < b.name) return -1;
+    if (a.name > b.name) return 1;
+    return 0;
+  });
+
+  // console.log("inputList = ", inputList.value);
+  // console.log("outputList = ", outputList.value);
+
+  let intputCaseList: string[] = await fileList2stringList(inputList.value);
+  let outputCaseList: string[] = await fileList2stringList(outputList.value);
+  console.log(intputCaseList.length, "<--->", outputCaseList.length);
+  const caseListLen = intputCaseList.length;
+  // 构建输入用例对象
+  for (let i = 0; i < caseListLen; i++) {
+    form.value.judgeCase.push({
+      input: intputCaseList[i],
+      output: outputCaseList[i],
+    });
+  }
+  console.log("form = ", form.value);
   // 区分更新还是创建
   if (updatePage) {
     const res = await QuestionControllerService.updateQuestionUsingPost(
@@ -191,27 +243,14 @@ const doSubmit = async () => {
     );
     if (res.code === 0) {
       message.success("创建成功");
+      router.push({
+        path: "/questions",
+        replace: true, //不会占用浏览器历史页面的堆栈,直接替换当前的登录页
+      });
     } else {
       message.error("创建失败，" + res.message);
     }
   }
-};
-
-/**
- * 新增判题用例
- */
-const handleAdd = () => {
-  form.value.judgeCase.push({
-    input: "",
-    output: "",
-  });
-};
-
-/**
- * 删除判题用例
- */
-const handleDelete = (index: number) => {
-  form.value.judgeCase.splice(index, 1);
 };
 
 const onContentChange = (value: string) => {
@@ -220,6 +259,44 @@ const onContentChange = (value: string) => {
 
 const onAnswerChange = (value: string) => {
   form.value.answer = value;
+};
+
+const inputCaseOnChange = (fileList) => {
+  inputList.value = fileList;
+};
+
+const outputCaseOnChange = (fileList) => {
+  outputList.value = fileList;
+};
+/**
+ * 将文件列表中的内容读取出来
+ */
+const fileList2stringList = async (fileList: any[]): Promise<string[]> => {
+  let ans: string[] = [];
+  for (const fileItem of fileList) {
+    let file: File = fileItem.file;
+    // 读取文件
+    const fileContent = await readTextFile(file);
+    ans.push(fileContent);
+  }
+  return ans;
+};
+
+const readTextFile = async (file: File) => {
+  const reader = new FileReader();
+  reader.readAsText(file, "utf8");
+  return new Promise((resolve, reject) => {
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+  });
+};
+
+const inputCancelUpload = () => {
+  inputList.value = [];
+};
+
+const outputCancelUpload = () => {
+  outputList.value = [];
 };
 </script>
 
